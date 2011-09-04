@@ -77,17 +77,6 @@ BEGIN {
 }
 
 
-=for internal
-
-=head1 our method activate_event( $event )
-
-This method is called by MooseX::Event when the first event listener for a
-particular event is registered.  We use this to start the AE::idle or
-AE::signal event listeners.  We wouldn't want them running when the user has
-no active listeners.
-
-=cut
-
 sub activate_event {
     my $self = shift;
     my( $event ) = @_;
@@ -99,16 +88,6 @@ sub activate_event {
         $self->_signal->{$sig} = AE::signal $sig, sub { $self->emit("SIG$sig") };
     }
 }
-
-=for internal
-
-=head1 our method deactivate_event( $event )
-
-This method is called by MooseX::Event when the last event listener for a
-particular event is removed.  We use this to shutdown the AE::idle or
-AE::signal event listeners when the last acitve listener is removed.
-
-=cut
 
 sub deactivate_event {
     my $self = shift;
@@ -179,14 +158,6 @@ sub import {
     *{$caller.'::collect'} = $class->can('collect');
 }
 
-=for internal
-
-=head1 our method unimport()
-
-Removes the collect helper method
-
-=cut
-
 sub unimport {
     my $caller = caller;
     no strict 'refs';
@@ -202,25 +173,68 @@ no MooseX::Event;
 
 =head1 SYNOPSIS
 
-# General event loop:
-
     use ONE;
-    
-    ONE->start;
 
-# Collation:
+    # Starting the main loop:
+    ONE->loop;
 
-    use ONE;
+    # Stopping the main loop (from an event handler or a Coro thread):
+    ONE->stop;
+
+    # One shot and repeating timers:
     use ONE::Timer;
+    ONE::Timer->after( $seconds => sub { ... } );
+    ONE::Timer->at( $time => sub { ... } );
+    ONE::Timer->every( $seconds => sub { ... } );
     
+    # Or with guards:
+    my $timer = ONE::Timer->every( $seconds => sub { ... } );
+    $timer->cancel(); # Ends the timer
+    $timer = undef;   # Also ends the timer
+    
+    # Coro/event loop safe sleeping
+    use ONE::Timer qw( sleep );
+    sleep $seconds;
+    
+    # POSIX signals:
+    ONE->on( SIGTERM => sub { ... } );
+
+    # Called when the event loop is idle (if applicable)
+    ONE->on( idle => sub { ... } );
+
+    # Wait for a collection of events to trigger once:
     collect {
          ONE::Timer->after( 2 => sub { say "two" } );
          ONE::Timer->after( 3 => sub { say "three" } );
-    }; # After three seconds will have printed "two" and "three"
+    }; 
+    # Will return after three seconds, having printed "two" and "three"
+
 
 =for test_synopsis
 use v5.10.0;
 
 =head1 DESCRIPTION
 
-=cut
+ONE provides a layer on top of AnyEvent that uses MooseX::Event as it's
+interface.  The goal of this suite of modules is to provide all of the
+functionality of L<AnyEvent> but with the style and ease of use of Node.js. 
+This suite of classes is intended to be use by programs written in the
+event-based style.
+
+If you're looking to make a class that emits events, you should see
+L<MooseX::Event>.
+
+=head1 SEE ALSO
+
+MooseX::Event
+ONE::Timer
+ONE::Collect
+
+=head1 RElATED
+
+=over
+
+=item L<AnyEvent>
+
+=back
+

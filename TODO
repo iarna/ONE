@@ -1,0 +1,38 @@
+Documentation:
+
+   The fact that event's get the object triggering them as their first
+   argument.
+
+
+ONE::IO
+   Wrap AE::IO
+ONE::Signal
+   Wrap AE::signal
+
+ONE::Subprocess
+   Fork + AE::child
+
+rename ONE to ONE::Listenable? MooseX::Event?
+
+   Events:
+     idle: AE::idle
+     SIG*: AE::signal *
+
+ONE::Handle
+   Wrap AnyEvent::Handle
+ONE::Socket
+   Wrap AnyEvent::Socket
+
+ONE::Collate
+   Document
+
+Look at AnyEvent::Debounce-- event collation would be nice to have as an
+option.
+
+ONE::Timer->every( 1 => dampen { say "boo" 
+my $t = ONE::Timer->new( interval=>1 );
+$t->on( timeout => dampen { say "boo" x @{$_[1]} } );
+$t->start;
+sleep 3.5;
+$t->cancel; # Will print "booboo" and "boo", as the first two ticks got
+            # combined, and the third tick 
