@@ -1,65 +1,44 @@
 # ABSTRACT: A Node.js style AnyEvent class, using MooseX::Event
 package ONE;
-use AnyEvent;
-use ONE::Collect;
 use MooseX::Event;
+use AnyEvent;
 
 with 'MooseX::Event::Role::ClassMethods';
 
-=helper collect { ... }
+has '_loop_cv' => (is=>'rw', init_arg=>undef);
+has '_idle_cv' => (is=>'rw', init_arg=>undef );
 
-Will return after all of the events declared inside the collect block have
-been emitted at least once.
+
+=event start
+
+This is emitted just before the event loop is started up with ONE's loop method.  Note
+that this will not be triggered if you start an event loop on your own, or via a utility
+method (like ONE::Coro::sleep).
 
 =cut
 
-sub collect (&) {
-    my $collect = ONE::Collect->new();
-    my $wrapper = MooseX::Event->add_listener_wrapper( sub {
-        my( $todo ) = @_;
-        $collect->listener( $todo );
-    } );
-    $_[0]->();
-    MooseX::Event->remove_listener_wrapper( $wrapper );
-    $collect->complete;
-}
+has_event 'start';
 
-has '_loop_cv' => (is=>'rw', init_arg=>undef);
-has '_idle_cv' => (is=>'rw', init_arg=>undef );
-has '_signal'  => (is=>'rw', default=>sub{{}}, init_arg=>undef);
+=event stop
+
+This is emitted just after the event loop is stopped with ONE's stop method.
+
+=cut
+
+has_event 'stop';
 
 =event idle
 
-This is an AnyEvent idle watcher.  It will repeatedly invoke the listener
-whenever the process is idle.  Several thousand times per second on a
-moderately loaded system.  Attaching a once listener to this will let you
-defer code until any active events have finished processing. 
+This will be repeatedly emitted whenever the process is idle.  This is many
+thousands of times per second on a modest system.  Attaching a once listener
+to this is a way to defer code until any active events have finished
+processing.
+
+This is implemented as an AnyEvent idle watcher.  
               
 =cut
 
-=event SIG*
-
-You can register event listeners for any of the following events:
-
-    SIGHUP   SIGINT  SIGQUIT SIGILL  SIGTRAP SIGABRT SIGBUS    SIGFPE    SIGKILL
-    SIGUSR1  SIGSEGV SIGUSR2 SIGPIPE SIGALRM SIGTERM SIGSTKFLT SIGCHLD   SIGCONT
-    SIGSTOP  SIGTSTP SIGTTIN SIGTTOU SIGURG  SIGXCPU SIGXFSZ   SIGVTALRM SIGPROF
-    SIGWINCH SIGIO   SIGPWR  SIGSYS
-
-Some of these may not actually be catchable (ie, SIGKILL), this is just the
-list from "kill -l" on a modern Linux system.  Using one of these installs
-any AnyEvent signal watcher.  As with AnyEvent, this will work
-
-=cut
-
-has_events qw(
-    idle 
-    SIGHUP   SIGINT  SIGQUIT SIGILL  SIGTRAP SIGABRT SIGBUS    SIGFPE    SIGKILL
-    SIGUSR1  SIGSEGV SIGUSR2 SIGPIPE SIGALRM SIGTERM SIGSTKFLT SIGCHLD   SIGCONT
-    SIGSTOP  SIGTSTP SIGTTIN SIGTTOU SIGURG  SIGXCPU SIGXFSZ   SIGVTALRM SIGPROF
-    SIGWINCH SIGIO   SIGPWR  SIGSYS );
-
-
+has_event 'idle';
 
 =classmethod our method instance() returns ONE
 
@@ -76,44 +55,35 @@ BEGIN {
     }
 }
 
-
 sub activate_event {
     my $self = shift;
-    my( $event ) = @_;
-    if ( $event eq 'idle' ) {
-        $self->_idle_cv( AE::idle( sub { $self->emit('idle'); } ) );
-    }
-    elsif ( $event =~ /^SIG([\w\d]+)$/ ) {
-        my $sig  = $1;
-        $self->_signal->{$sig} = AE::signal $sig, sub { $self->emit("SIG$sig") };
-    }
+    $self->_idle_cv( AE::idle( sub { $self->emit('idle'); } ) );
 }
 
 sub deactivate_event {
     my $self = shift;
-    my( $event ) = @_;
-    if ( $event eq 'idle' ) {
-        $self->_idle_cv( undef );
-    }
-    elsif ( $event =~ /^SIG([\w\d]+)$/ ) {
-        delete $self->_signal->{$1};
-    } 
+    $self->_idle_cv( undef );
 }
 
 =classmethod our method loop()
 
 Starts the main event loop.  This will return when the stop method is
 called.  If you call start with an already active loop, the previous loop
-will be stopped and a new one started.
+will be stopped and a new one started, exactly as if you called stop()
+before calling loop().
+
+Calling this will emit a start event (but only after the previously active
+loop was stopped).
 
 =cut
 
 sub loop {
-    my $cors = shift;
-    my $self = ref $cors ? $cors : $cors->instance;
+    my $invok = shift;
+    my $self = ref($invok)? $invok: $invok->instance;
     if ( defined $self->_loop_cv ) {
-        $self->_loop_cv->send();
+        $self->stop();
     }
+    $self->emit( 'start' );
     my $cv = AE::cv;
     $self->_loop_cv( $cv );
     $cv->recv();
@@ -121,14 +91,16 @@ sub loop {
 
 =classmethod our method stop() 
 
-Exits the main event loop.
+Exits the main event loop and emits the stop event.  If no loop is active it
+does nothing and does not emit an event.
 
 =cut
 
 sub stop {
-    my $cors = shift;
-    my $self = ref $cors ? $cors : $cors->instance;
+    my $invok = shift;
+    my $self = ref($invok)? $invok: $invok->instance;
     return unless defined $self->_loop_cv;
+    $self->emit( 'stop' );
     $self->_loop_cv->send();
     delete $self->{'_loop_cv'};
 }
@@ -154,14 +126,6 @@ sub import {
         }
     }
     
-    no strict 'refs';
-    *{$caller.'::collect'} = $class->can('collect');
-}
-
-sub unimport {
-    my $caller = caller;
-    no strict 'refs';
-    delete ${$caller.'::'}{'collect'};
 }
 
 __PACKAGE__->meta->make_immutable();
@@ -183,35 +147,53 @@ no MooseX::Event;
 
     # One shot and repeating timers:
     use ONE::Timer;
-    ONE::Timer->after( $seconds => sub { ... } );
-    ONE::Timer->at( $time => sub { ... } );
-    ONE::Timer->every( $seconds => sub { ... } );
+    ONE::Timer->after( $seconds => sub { $do_something } );
+    ONE::Timer->at( $time => sub { $do_something } );
+    ONE::Timer->every( $seconds => sub { $do_something } );
     
     # Or with guards:
-    my $timer = ONE::Timer->every( $seconds => sub { ... } );
+    my $timer = ONE::Timer->every( $seconds => sub { $do_something } );
     $timer->cancel(); # Ends the timer
     $timer = undef;   # Also ends the timer
     
     # Coro/event loop safe sleeping
-    use ONE::Timer qw( sleep );
+    use ONE::Coro qw( sleep );
     sleep $seconds;
     
     # POSIX signals:
-    ONE->on( SIGTERM => sub { ... } );
+    use ONE::Signal;
+    ONE::Signal->on( TERM => sub { $do_something } );
 
     # Called when the event loop is idle (if applicable)
-    ONE->on( idle => sub { ... } );
+    ONE->on( idle => sub { $do_something } );
 
-    # Wait for a collection of events to trigger once:
-    collect {
-         ONE::Timer->after( 2 => sub { say "two" } );
-         ONE::Timer->after( 3 => sub { say "three" } );
+    # Trigger an event only after some other events have triggered
+    use ONE::Collect;
+    my $group = ONE::Collect->group(sub {
+        ONE::Timer->after( 2 => sub { $do_something } );
+        ONE::Timer->after( 3 => sub { $do_something } );
+        });
+    $group->once( complete => sub { $do_something } );
+    
+    # Or procedurally:
+    use ONE::Coro qw( collect );
+    collect { # Return after both events have been emitted
+         ONE::Timer->after( 2 => sub { $do_something } );
+         ONE::Timer->after( 3 => sub { $do_something } );
     }; 
-    # Will return after three seconds, having printed "two" and "three"
 
+
+    # You can chain one modules on to the use line...
+    use ONE qw( Timer Collect );
+    
+    # If you want to import something from them, use = like the perl commandline
+    use ONE qw( Timer=sleep Collect );
+    
+    # To import more then one symbol from a class, separate from with colons (:)
+    use ONE qw( Timer=sleep:sleep_until Collect );
 
 =for test_synopsis
-use v5.10.0;
+use v5.10.0; my($do_something,$seconds,$time);
 
 =head1 DESCRIPTION
 
@@ -224,11 +206,28 @@ event-based style.
 If you're looking to make a class that emits events, you should see
 L<MooseX::Event>.
 
+=head1 EVENT HANDLERS
+
+All event handlers receive the object that emitted the event as their first argument,
+along with any event specific arguments after that.  In the case of ONE::Timer, this object
+is the guard object-- you can cancel a repeating timer in this fashion, even if you didn't
+store the object to begin with.  
+
+=head1 COROUTINES
+
+The event system that ONE is built on, L<MooseX::Event>, is L<Coro> aware,
+and you do not need to use unblock_sub with any ONE event listeners. 
+L<MooseX::Event> listeners and thus by extenstion, ONE listeners, always run
+in their own thread when L<Coro> is loaded.  As such, you can safely block
+from them without risking deadlocks or other nastyness.
+
 =head1 SEE ALSO
 
 MooseX::Event
 ONE::Timer
 ONE::Collect
+ONE::Signal
+ONE::Coro
 
 =head1 RElATED
 

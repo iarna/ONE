@@ -10,7 +10,7 @@ BEGIN {
         eval q{ use Test::More tests => 5 };
     }
 }
-use ONE qw( Timer=sleep:sleep_until );
+use ONE qw( Timer Coro=sleep:sleep_until );
 
 my $after_test;
 ONE::Timer->after( .1, sub { $after_test ++ } );

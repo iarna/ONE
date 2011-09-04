@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use Test::More tests => 6;
+use Coro;
 use ONE qw( Timer Signal Coro=sleep:collect );
 
 my $started = 0; 
@@ -12,8 +13,14 @@ my $idlecount = 0;
 my $idle = ONE->on( idle => sub { $idlecount ++ } );
 
 # We're also testing loop and stop here
-ONE::Timer->after( 0.1 => sub { ONE->stop } );
+# And just to prove we can, we cede here, this is safe because under Coro,
+# event listeners run in their own threads
+ONE::Timer->every( 0.1 => sub { cede; ONE->stop } );
+
 ONE->loop;
+
+is( $started, 1, "The start event triggered" );
+is( $finished, 1, "The stop event triggered" );
 
 cmp_ok( $idlecount, '>', 1000, "The idle counter ticked a reasonable number of times." );
 
@@ -21,28 +28,9 @@ ONE->remove_listener( idle =>$idle );
 
 $idlecount = 0;
 
-sleep .1;
+ONE->loop; # The every trigger we setup earlier will continue to fire, stopping us again.
 
 is( $idlecount, 0, "The idle counter did not tick after we removed it" );
 
-is( $started, 1, "The start event triggered" );
-is( $finished, 1, "The stop event triggered" );
-
-my $alarm = 0;
-ONE::Signal->on( ALRM => sub { $alarm ++ } );
-alarm(1);
-sleep 1.1;
-alarm(0);
-
-is( $alarm, 1, "The alarm signal triggered" );
-
-my $cnt = 0;
-
-collect {
-    ONE::Timer->every( 0.2 => sub { $cnt ++ } );
-    ONE::Timer->every( 0.5 => sub { $cnt += 10 } );
-};
-is( $cnt, 12, "We collected three event triggers of the right kinds" );
-
-
-done_testing( 6 );
+is( $started, 2, "The start event triggered (again)" );
+is( $finished, 2, "The stop event triggered (again)" );

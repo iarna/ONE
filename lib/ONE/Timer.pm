@@ -5,7 +5,7 @@ use AnyEvent ();
 use MooseX::Event;
 use Scalar::Util ();
 
-=attr our Num|CodeRef $.delay is ro = 0;
+=attr our Num|CodeRef $.delay is ro = 0
 
 The number of seconds to delay before triggering this event.  By default, triggers immediately.
 
@@ -13,7 +13,7 @@ The number of seconds to delay before triggering this event.  By default, trigge
 has 'delay'    => (isa=>'Num|CodeRef', is=>'ro', default=>0);
 
 
-=attr our Num $.interval is ro = 0;
+=attr our Num $.interval is ro = 0
 
 The number of seconds to delay
 
@@ -30,39 +30,7 @@ This event takes no arguments.  It's emitted when the event time completes.
 
 has_event 'timeout';
 
-no MooseX::Event; # Remove the moose helpers, so we can declare our own after method
-
-use Exporter;
-*import = \&Exporter::import;
-
-our @EXPORT_OK = qw( sleep sleep_until );
-
-=helper our sub sleep( Rat $secs ) is export
-
-Sleep for $secs while allowing events to emit (and Coroutine threads to run)
-
-=cut
-
-sub sleep {
-    return if $_[-1] <= 0;
-    my $cv = AE::cv;
-    my $w; $w=AE::timer( $_[-1], 0, sub { undef $w; $cv->send } );
-    $cv->recv;
-}
-
-=helper our sub sleep_until( Rat $epochtime ) is export
-
-Sleep until $epochtime while allowing events to emit (and Coroutine threads to run)
-
-=cut
-
-sub sleep_until {
-    my $for = $_[-1] - AE::time;
-    return if $for <= 0;
-    my $cv = AE::cv;
-    my $w; $w=AE::timer( $for, 0, sub { undef $w; $cv->send } );
-    $cv->recv;
-}
+no MooseX::Event; # Remove the moose helpers now, so we can declare our own "after" method
 
 =classmethod our method after( Rat $seconds, CodeRef $on_timeout ) returns ONE::Timer
 
@@ -180,20 +148,16 @@ __PACKAGE__->meta->make_immutable();
 
 =head1 SYNOPSIS
 
-    use ONE qw( Timer=sleep:sleep_until );
+    use ONE::Timer;
     
     # After five seconds, say Hi
     ONE::Timer->after( 5, sub { say "Hi!" } );
-    
-    sleep 3; # Sleep for 3 seconds without blocking events from firing
     
     # Two seconds from now, say At!
     ONE::Timer->at( time()+2, sub { say "At!" } );
     
     # Every 5 seconds, starting 5 seconds from now, say Ping
     ONE::Timer->every( 5, sub { say "Ping" } );
-    
-    sleep_until time()+10; # Sleep until 10 seconds from now
     
     my $timer = ONE::Timer->new( delay=>5, interval=>25 );
     
