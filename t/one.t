@@ -15,7 +15,7 @@ my $idle = ONE->on( idle => sub { $idlecount ++ } );
 ONE::Timer->after( 0.1 => sub { ONE->stop } );
 ONE->loop;
 
-cmp_ok( $idlecount, '>', 1000, "The idle counter ticked a reasonable number of times." );
+cmp_ok( $idlecount, '>', 100, "The idle counter ticked a reasonable number of times." );
 
 ONE->remove_listener( idle =>$idle );
 

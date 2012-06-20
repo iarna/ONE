@@ -22,7 +22,7 @@ ONE->loop;
 is( $started, 1, "The start event triggered" );
 is( $finished, 1, "The stop event triggered" );
 
-cmp_ok( $idlecount, '>', 1000, "The idle counter ticked a reasonable number of times." );
+cmp_ok( $idlecount, '>', 100, "The idle counter ticked a reasonable number of times." );
 
 ONE->remove_listener( idle =>$idle );
 

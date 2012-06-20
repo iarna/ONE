@@ -55,14 +55,20 @@ BEGIN {
     }
 }
 
-sub activate_event {
+sub BUILD {
     my $self = shift;
-    $self->_idle_cv( AE::idle( sub { $self->emit('idle'); } ) );
-}
-
-sub deactivate_event {
-    my $self = shift;
-    $self->_idle_cv( undef );
+    $self->on( first_listener => sub {
+        my $self = shift;
+        my($event) = @_;
+        return unless $event eq 'idle';
+        $self->_idle_cv( AE::idle( sub { $self->emit($event) } ) );
+    } );
+    $self->on( no_listeners => sub {
+        my $self = shift;
+        my($event) = @_;
+        return unless $event eq 'idle';
+        $self->_idle_cv( undef );
+    } );
 }
 
 =classmethod our method loop()

@@ -2,6 +2,7 @@
 package ONE::Signal;
 use MooseX::Event;
 use AnyEvent;
+use Config ();
 
 with 'MooseX::Event::Role::ClassMethods';
 
@@ -9,27 +10,34 @@ has '_signal'  => (is=>'rw', default=>sub{{}}, init_arg=>undef);
 
 =event <SIG>
 
-Where <SIG> is one of the signal names below:
+Where <SIG> is one of the signal names from Config's sig_name key.  Common
+signals to trap include:
 
-    HUP   INT  QUIT ILL  TRAP ABRT BUS    FPE    KILL
-    USR1  SEGV USR2 PIPE ALRM TERM STKFLT CHLD   CONT
-    STOP  TSTP TTIN TTOU URG  XCPU XFSZ   VTALRM PROF
-    WINCH IO   PWR  SYS
-
-Some of these may not actually be catchable (ie, KILL).  This is just the
-list from "kill -l" on a modern Linux system.  Using one of these installs
-any AnyEvent signal watcher. 
+    HUP, INT, ALRM, USR1, USR2, TERM, CHLD
 
 =cut
 
+has_events split / /, $Config::Config{'sig_name'};
 
-has_events qw(
-    HUP   INT  QUIT ILL  TRAP ABRT BUS    FPE    KILL
-    USR1  SEGV USR2 PIPE ALRM TERM STKFLT CHLD   CONT
-    STOP  TSTP TTIN TTOU URG  XCPU XFSZ   VTALRM PROF
-    WINCH IO   PWR  SYS );
+sub BUILD {
+    my $self = shift;
+    $self->on( first_listener => sub {
+        my $self = shift;
+        my( $event ) = @_;
+        if ( $event =~ /^[A-Z]+$/ ) {
+            $self->_signal->{$event} = AE::signal $event, sub { $self->emit($event) };
+        }
+    } );
+    $self->on( no_listeners   => sub {
+        my $self = shift;
+        my( $event ) = @_;
+        if ( exists $self->_signal->{$event} ) {
+            delete $self->_signal->{$event};
+        }
+    } );
+}
 
-=classmethod our method instance() returns ONE
+=classmethod method instance() returns ONE
 
 Return the singleton object for this class
 
@@ -44,25 +52,13 @@ BEGIN {
     }
 }
 
-sub activate_event {
-    my $self = shift;
-    my( $event ) = @_;
-    $self->_signal->{$event} = AE::signal $event, sub { $self->emit($event) };
-}
-
-sub deactivate_event {
-    my $self = shift;
-    my( $event ) = @_;
-    delete $self->_signal->{$event};
-}
-
 1;
 
 =head1 SYNOPSIS
 
     # POSIX signals:
     use ONE::Signal;
-    ONE::Signal->on( TERM => sub { ... } );
+    ONE::Signal->on( INT => sub { ... } );
 
 =head1 DESCRIPTION
 

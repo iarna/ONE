@@ -118,7 +118,7 @@ sub start {
     else {
         $delay = $self->delay;
     }
-    my $w = AE::timer $delay, $self->interval, sub { $self->emit('timeout') };
+    my $w = AE::timer $delay, $self->interval, $cb;
     $self->_guard( $w );
 }
 
