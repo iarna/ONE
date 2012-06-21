@@ -2,6 +2,7 @@
 package ONE;
 use MooseX::Event;
 use AnyEvent;
+use 5.10.0;
 
 with 'MooseX::Event::Role::ClassMethods';
 
@@ -40,6 +41,10 @@ This is implemented as an AnyEvent idle watcher.
 
 has_event 'idle';
 
+# This is used interanlly via ONE->next.  It should not be used directly as
+# it would be an error to listen for it with 'on' versus 'once.'
+has_event 'postpone';
+
 =classmethod our method instance() returns ONE
 
 Return the singleton object for this class
@@ -60,8 +65,14 @@ sub BUILD {
     $self->on( first_listener => sub {
         my $self = shift;
         my($event) = @_;
-        return unless $event eq 'idle';
-        $self->_idle_cv( AE::idle( sub { $self->emit($event) } ) );
+        given ($event) {
+            when ('idle') {
+                $self->_idle_cv( AE::idle( sub { $self->emit($event) } ) );
+            }
+            when ('postpone') {
+                AE::postpone { $self->emit('postpone') }
+            }
+        }
     } );
     $self->on( no_listeners => sub {
         my $self = shift;
@@ -109,6 +120,29 @@ sub stop {
     $self->emit( 'stop' );
     $self->_loop_cv->send();
     delete $self->{'_loop_cv'};
+}
+
+=classmethod method next( CodeRef $todo )
+
+This executes $todo at the next opportunity without actually doing so
+immediately.  Basically, this falls back to the event loop and then executes
+$todo.  That is:
+
+    ONE->next(sub { ... } );
+
+Is conceptually the same as:
+
+    AE::postpone { ... };
+
+Except that the latter won't actually trigger a MooseX::Event style event and
+so it won't be wrapped, provide a $self object, etc.
+
+=cut
+sub next {
+    my $invok = shift;
+    my $self = ref($invok)? $invok: $invok->instance;
+    my($todo) = @_;
+    $self->once( 'postpone', $todo );
 }
 
 sub import {
@@ -171,7 +205,7 @@ no MooseX::Event;
     ONE::Signal->on( TERM => sub { $do_something } );
 
     # Called when the event loop is idle (if applicable)
-    ONE->on( idle => sub { $do_something } );
+    ONE->once( idle => sub { $do_something } );
 
     # Trigger an event only after some other events have triggered
     use ONE::Collect;

@@ -70,10 +70,10 @@ sub listener {
     # Here we wrap the event listener and, after the first call, remove ourselves
     my $wrapped;
     $wrapped = sub { 
-        my $self = shift;
+        my($self) = @_; # No shift to not disturb args
         $self->remove_listener( $self->current_event, $wrapped );
         $self->on( $self->current_event, $todo );
-        $todo->(@_); 
+        $todo->(@_);
         $any_cv->send();
         $all_cv->end();
         undef $wrapped;

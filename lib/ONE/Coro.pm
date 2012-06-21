@@ -107,7 +107,7 @@ The helpers in this module are exported by L<Sub::Exporter>.
 
 ONE
 ONE::Timer
-ONE::COllect
+ONE::Collect
 
 =head1 RELATED
 

@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 6;
+use Test::More tests => 8;
 use ONE qw( Timer Signal Coro=sleep:collect );
 
 my $started = 0; 
@@ -44,5 +44,12 @@ collect {
 };
 is( $cnt, 12, "We collected three event triggers of the right kinds" );
 
+my $postponed = 0;
+collect {
+    ONE::Timer->after( 0 => sub {} );
+    ONE->next(sub { $postponed = 1 });
+    is( $postponed, 0, "Our postponed code hasn't been excuted prior to entering the event loop" );
+};
+is( $postponed, 1, "Our postponed code was executed" );
 
-done_testing( 6 );
+done_testing( 8 );
