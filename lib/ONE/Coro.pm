@@ -8,6 +8,7 @@ use Sub::Exporter -setup => {
     };
 
 =helper sub collect( &block ) is export
+
 =helper sub collect_all( &block ) is export
 
 Will return after all of the events declared inside the collect block have
