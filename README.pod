@@ -1,0 +1,204 @@
+=head1 NAME
+
+ONE - A Node.js style AnyEvent class, using MooseX::Event
+
+=head1 VERSION
+
+version 0.3.0
+
+=head1 SYNOPSIS
+
+    use ONE;
+
+    # Starting the main loop:
+    ONE->loop;
+
+    # Stopping the main loop (from an event handler or a Coro thread):
+    ONE->stop;
+
+    # One shot and repeating timers:
+    use ONE::Timer;
+    ONE::Timer->after( $seconds => sub { $do_something } );
+    ONE::Timer->at( $time => sub { $do_something } );
+    ONE::Timer->every( $seconds => sub { $do_something } );
+
+    # Or with guards:
+    my $timer = ONE::Timer->every( $seconds => sub { $do_something } );
+    $timer->cancel(); # Ends the timer
+    $timer = undef;   # Also ends the timer
+
+    # Coro/event loop safe sleeping
+    use ONE::Coro qw( sleep );
+    sleep $seconds;
+
+    # POSIX signals:
+    use ONE::Signal;
+    ONE::Signal->on( TERM => sub { $do_something } );
+
+    # Called when the event loop is idle (if applicable)
+    ONE->on( idle => sub { $do_something } );
+
+    # Trigger an event only after some other events have triggered
+    use ONE::Collect;
+    my $group = ONE::Collect->group(sub {
+        ONE::Timer->after( 2 => sub { $do_something } );
+        ONE::Timer->after( 3 => sub { $do_something } );
+        });
+    $group->once( complete => sub { $do_something } );
+
+    # Or procedurally:
+    use ONE::Coro qw( collect );
+    collect { # Return after both events have been emitted
+         ONE::Timer->after( 2 => sub { $do_something } );
+         ONE::Timer->after( 3 => sub { $do_something } );
+    };
+
+
+    # You can chain one modules on to the use line...
+    use ONE qw( Timer Collect );
+
+    # If you want to import something from them, use = like the perl commandline
+    use ONE qw( Timer=sleep Collect );
+
+    # To import more then one symbol from a class, separate from with colons (:)
+    use ONE qw( Timer=sleep:sleep_until Collect );
+
+=head1 DESCRIPTION
+
+ONE provides a layer on top of AnyEvent that uses MooseX::Event as it's
+interface.  The goal of this suite of modules is to provide all of the
+functionality of L<AnyEvent> but with the style and ease of use of Node.js.
+This suite of classes is intended to be use by programs written in the
+event-based style.
+
+If you're looking to make a class that emits events, you should see
+L<MooseX::Event>.
+
+=head1 EVENTS
+
+=head2 start
+
+This is emitted just before the event loop is started up with ONE's loop method.  Note
+that this will not be triggered if you start an event loop on your own, or via a utility
+method (like ONE::Coro::sleep).
+
+=head2 stop
+
+This is emitted just after the event loop is stopped with ONE's stop method.
+
+=head2 idle
+
+This will be repeatedly emitted whenever the process is idle.  This is many
+thousands of times per second on a modest system.  Attaching a once listener
+to this is a way to defer code until any active events have finished
+processing.
+
+This is implemented as an AnyEvent idle watcher.
+
+=head1 CLASS METHODS
+
+=head2 our method instance() returns ONE
+
+Return the singleton object for this class
+
+=head2 our method loop()
+
+Starts the main event loop.  This will return when the stop method is
+called.  If you call start with an already active loop, the previous loop
+will be stopped and a new one started, exactly as if you called stop()
+before calling loop().
+
+Calling this will emit a start event (but only after the previously active
+loop was stopped).
+
+=head2 our method stop()
+
+Exits the main event loop and emits the stop event.  If no loop is active it
+does nothing and does not emit an event.
+
+=for test_synopsis use v5.10.0; my($do_something,$seconds,$time);
+
+=head1 EVENT HANDLERS
+
+All event handlers receive the object that emitted the event as their first argument,
+along with any event specific arguments after that.  In the case of ONE::Timer, this object
+is the guard object-- you can cancel a repeating timer in this fashion, even if you didn't
+store the object to begin with.
+
+=head1 COROUTINES
+
+The event system that ONE is built on, L<MooseX::Event>, is L<Coro> aware,
+and you do not need to use unblock_sub with any ONE event listeners.
+L<MooseX::Event> listeners and thus by extenstion, ONE listeners, always run
+in their own thread when L<Coro> is loaded.  As such, you can safely block
+from them without risking deadlocks or other nastyness.
+
+=head1 RElATED
+
+=over
+
+=item L<AnyEvent>
+
+=back
+
+=head1 SEE ALSO
+
+Please see those modules/websites for more information related to this module.
+
+=over 4
+
+=item *
+
+L<MooseX::Event|MooseX::Event>
+
+=item *
+
+L<ONE::Timer|ONE::Timer>
+
+=item *
+
+L<ONE::Collect|ONE::Collect>
+
+=item *
+
+L<ONE::Signal|ONE::Signal>
+
+=item *
+
+L<ONE::Coro|ONE::Coro>
+
+=back
+
+=head1 AUTHOR
+
+Rebecca Turner <becca@referencethis.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2011 by Rebecca Turner.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=head1 DISCLAIMER OF WARRANTY
+
+BECAUSE THIS SOFTWARE IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
+FOR THE SOFTWARE, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT
+WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER
+PARTIES PROVIDE THE SOFTWARE "AS IS" WITHOUT WARRANTY OF ANY KIND,
+EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE
+SOFTWARE IS WITH YOU. SHOULD THE SOFTWARE PROVE DEFECTIVE, YOU ASSUME
+THE COST OF ALL NECESSARY SERVICING, REPAIR, OR CORRECTION.
+
+IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+REDISTRIBUTE THE SOFTWARE AS PERMITTED BY THE ABOVE LICENCE, BE LIABLE
+TO YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL, OR
+CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE THE
+SOFTWARE (INCLUDING BUT NOT LIMITED TO LOSS OF DATA OR DATA BEING
+RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A
+FAILURE OF THE SOFTWARE TO OPERATE WITH ANY OTHER SOFTWARE), EVEN IF
+SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGES.
