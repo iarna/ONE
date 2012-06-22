@@ -45,7 +45,7 @@ has_event 'idle';
 # it would be an error to listen for it with 'on' versus 'once.'
 has_event 'postpone';
 
-=classmethod our method instance() returns ONE
+=classmethod method instance() returns ONE
 
 Return the singleton object for this class
 
