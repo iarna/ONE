@@ -7,8 +7,8 @@ use Sub::Exporter -setup => {
     exports => [qw( collect collect_all collect_any sleep sleep_until )],
     };
 
-=helper our sub collect( &block ) is export
-=helper our sub collect_all( &block ) is export
+=helper sub collect( &block ) is export
+=helper sub collect_all( &block ) is export
 
 Will return after all of the events declared inside the collect block have
 been emitted at least once.
@@ -22,7 +22,7 @@ sub collect (&) {
     $cv->recv;
 }
 
-=helper our sub collect_any( &block ) is export
+=helper sub collect_any( &block ) is export
 
 Will return after any of the events declared inside the collect block have
 been emitted at least once.  Note that it doesn't actually cancel the
@@ -37,7 +37,7 @@ sub collect_any (&) {
     $cv->recv;
 }
 
-=helper our sub sleep( Rat $secs ) is export
+=helper sub sleep( Rat $secs ) is export
 
 Sleep for $secs while allowing events to emit (and Coroutine threads to run)
 
@@ -51,7 +51,7 @@ sub sleep {
     return;
 }
 
-=helper our sub sleep_until( Rat $epochtime ) is export
+=helper sub sleep_until( Rat $epochtime ) is export
 
 Sleep until $epochtime while allowing events to emit (and Coroutine threads to run)
 
@@ -69,6 +69,7 @@ sub sleep_until {
 1;
 
 =head1 SYNOPSIS
+
     use ONE::Coro qw( collect collect_any sleep );
 
     # Wait for all of a collection of events to trigger once:
@@ -88,6 +89,7 @@ sub sleep_until {
 
     # Sleep for 3 seconds without blocking events from firing
     sleep 3; 
+    
 
 =for test_synopsis
 use 5.10.0;

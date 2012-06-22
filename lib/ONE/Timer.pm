@@ -5,7 +5,7 @@ use AnyEvent ();
 use MooseX::Event;
 use Scalar::Util ();
 
-=attr our Num|CodeRef $.delay is ro = 0
+=attr Num|CodeRef $.delay is ro = 0
 
 The number of seconds to delay before triggering this event.  By default, triggers immediately.
 
@@ -13,7 +13,7 @@ The number of seconds to delay before triggering this event.  By default, trigge
 has 'delay'    => (isa=>'Num|CodeRef', is=>'ro', default=>0);
 
 
-=attr our Num $.interval is ro = 0
+=attr Num $.interval is ro = 0
 
 The number of seconds to delay
 
@@ -24,7 +24,7 @@ has '_guard'   => (is=>'rw');
 
 =event timeout
 
-This event takes no arguments.  It's emitted when the event time completes.
+Emitted when the event time completes.
 
 =cut
 
@@ -48,7 +48,7 @@ sub after {
     return $self;
 }
 
-=classmethod our method at( Rat $epochtime, CodeRef $on_timeout ) returns ONE::Timer
+=classmethod method at( Rat $epochtime, CodeRef $on_timeout ) returns ONE::Timer
 
 Asychronously waits until $epochtime and then calls $on_timeout. If you store the
 return value, it acts as a guard-- if it's destoryed then the timer is canceled.
@@ -64,7 +64,7 @@ sub at {
     return $self;
 }
 
-=classmethod our method every( Rat $seconds, CodeRef $on_timeout ) returns ONE::Timer
+=classmethod method every( Rat $seconds, CodeRef $on_timeout ) returns ONE::Timer
 
 Asychronously, after $seconds and every $seconds there after, calls $on-Timeout.  If you
 store the return value it acts as a guard-- if it's destroyed then the timer is canceled.
@@ -80,13 +80,13 @@ sub every {
     return $self;
 }
 
-=classmethod our method new( :$delay, :$interval? ) returns ONE::Timer
+=classmethod method new( :$delay, :$interval? ) returns ONE::Timer
 
 Creates a new timer object that will emit it's "timeout" event after $delay
 seconds and every $interval seconds there after.  Delay can be a code ref,
 in which case it's return value is the number of seconds to delay.
 
-=method our method start( $is_obj_guard = False )
+=method method start( $is_obj_guard = False )
 
 Starts the timer object running.  If $is_obj_guard is true, then destroying
 the object will cancel the timer.
@@ -122,7 +122,7 @@ sub start {
     $self->_guard( $w );
 }
 
-=method our method cancel()
+=method method cancel()
 
 Cancels a running timer. You can start the timer again by calling the start
 method.  For after and every timers, it begins waiting all over again. At timers will

@@ -23,14 +23,14 @@ This is emitted only after all of the grouped events have been emitted.
 
 has_event 'complete';
 
-=classmethod our group( CodeRef $setup ) returns ONE::Collect
+=classmethod group( CodeRef $setup ) returns ONE::Collect
 
 Make any event listeners created inside $setup a part of a new event group
 and return that group.
 
 =cut
 
-=method our group( CodeRef $setup )
+=method group( CodeRef $setup )
 
 Make any event listeners created inside $setup a part of this event group.  
 
@@ -47,7 +47,7 @@ sub group {
 }
 
 
-=method our listener( CodeRef $todo ) returns CodeRef
+=method listener( CodeRef $todo ) returns CodeRef
 
 This wraps an event listener such that it will be a part of this group.
 

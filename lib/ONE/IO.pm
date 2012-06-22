@@ -76,7 +76,8 @@ sub BUILD {
     my $stdin = ONE::IO->new( fh=>\*STDIN );
     $stdin->once( readable => sub {
         my $self = shift;
-        chomp( my $input = <$self->fh>);
+        my( $fh ) = @_;
+        chomp( my $input = <$fh>);
         warn "Read: $input\n";
     });
 

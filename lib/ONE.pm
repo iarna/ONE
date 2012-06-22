@@ -82,7 +82,7 @@ sub BUILD {
     } );
 }
 
-=classmethod our method loop()
+=classmethod method loop()
 
 Starts the main event loop.  This will return when the stop method is
 called.  If you call start with an already active loop, the previous loop
@@ -106,7 +106,7 @@ sub loop {
     $cv->recv();
 }
 
-=classmethod our method stop() 
+=classmethod method stop() 
 
 Exits the main event loop and emits the stop event.  If no loop is active it
 does nothing and does not emit an event.
