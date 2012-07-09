@@ -269,7 +269,7 @@ ONE::Collect
 ONE::Signal
 ONE::Coro
 
-=head1 RElATED
+=head1 RELATED
 
 =over
 
