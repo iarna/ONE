@@ -199,7 +199,9 @@ no MooseX::Event;
     # Starting the main loop:
     ONE->loop;
 
-    # Stopping the main loop (from an event handler or a Coro thread):
+    # We now block until either an event handler or Coro thread calls...
+
+    # Stopping the main loop
     ONE->stop;
 
     # One shot and repeating timers:
@@ -214,7 +216,7 @@ no MooseX::Event;
     $timer = undef;   # Also ends the timer
 
     # Coro/event loop safe sleeping
-    use ONE::Coro qw( sleep );
+    use ONE::Sleep; # This is really AnyEvent::Sleep
     sleep $seconds;
 
     # POSIX signals:
@@ -225,29 +227,34 @@ no MooseX::Event;
     ONE->once( idle => event { $do_something } );
 
     # Trigger an event only after some other events have triggered
-    use ONE::Collect;
-    my $group = ONE::Collect->group(event {
-        ONE::Timer->after( 2 => event { $do_something } );
-        ONE::Timer->after( 3 => event { $do_something } );
-        });
-    $group->once( complete => event { $do_something } );
 
-    # Or procedurally:
-    use ONE::Coro qw( collect );
-    collect { # Return after both events have been emitted
+    use ONE::Collect; # Really just AnyEvent::Collect
+
+    # Collect returns only after both events have been emitted
+    collect {
          ONE::Timer->after( 2 => event { $do_something } );
          ONE::Timer->after( 3 => event { $do_something } );
     };
+
+    # Call an event based API syncronously
+    use ONE::Capture;
+
+    # This is essentially the same thing as "sleep 2"
+    capture { ONE::Timer->after( 2 => shift ) };
+
+    # Event arguments become the return value:
+    use AnyEvent::Socket qw( inet_aton );
+    my @ips = capture { inet_aton( 'www.google.com', shift ) };
 
 
     # You can chain one modules on to the use line...
     use ONE qw( Timer Collect );
 
     # If you want to import something from them, use = like the perl commandline
-    use ONE qw( Timer=sleep Collect );
+    use ONE qw( Timer Sleep=sleep);
 
-    # To import more then one symbol from a class, separate from with colons (:)
-    use ONE qw( Timer=sleep:sleep_until Collect );
+    # To import more then one symbol from a class, separate them with colons (:)
+    use ONE qw( Timer Sleep=sleep:sleep_until Collect );
 
 =for test_synopsis
 use v5.10.0; my($do_something,$seconds,$time);
@@ -282,7 +289,7 @@ from them without risking deadlocks or other nastyness.
 
 MooseX::Event
 ONE::Timer
-ONE::Collect
+AnyEvent:Collect
 ONE::Signal
 ONE::Coro
 

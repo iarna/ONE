@@ -15,55 +15,62 @@ version 0.3.0
     # Starting the main loop:
     ONE->loop;
 
-    # Stopping the main loop (from an event handler or a Coro thread):
+    # We now block until either an event handler or Coro thread calls...
+
+    # Stopping the main loop
     ONE->stop;
 
     # One shot and repeating timers:
     use ONE::Timer;
-    ONE::Timer->after( $seconds => sub { $do_something } );
-    ONE::Timer->at( $time => sub { $do_something } );
-    ONE::Timer->every( $seconds => sub { $do_something } );
+    ONE::Timer->after( $seconds => event { $do_something } );
+    ONE::Timer->at( $time => event { $do_something } );
+    ONE::Timer->every( $seconds => event { $do_something } );
 
     # Or with guards:
-    my $timer = ONE::Timer->every( $seconds => sub { $do_something } );
+    my $timer = ONE::Timer->every( $seconds => event { $do_something } );
     $timer->cancel(); # Ends the timer
     $timer = undef;   # Also ends the timer
 
     # Coro/event loop safe sleeping
-    use ONE::Coro qw( sleep );
+    use ONE::Sleep; # This is really AnyEvent::Sleep
     sleep $seconds;
 
     # POSIX signals:
     use ONE::Signal;
-    ONE::Signal->on( TERM => sub { $do_something } );
+    ONE::Signal->on( TERM => event { $do_something } );
 
     # Called when the event loop is idle (if applicable)
-    ONE->once( idle => sub { $do_something } );
+    ONE->once( idle => event { $do_something } );
 
     # Trigger an event only after some other events have triggered
-    use ONE::Collect;
-    my $group = ONE::Collect->group(sub {
-        ONE::Timer->after( 2 => sub { $do_something } );
-        ONE::Timer->after( 3 => sub { $do_something } );
-        });
-    $group->once( complete => sub { $do_something } );
 
-    # Or procedurally:
-    use ONE::Coro qw( collect );
-    collect { # Return after both events have been emitted
-         ONE::Timer->after( 2 => sub { $do_something } );
-         ONE::Timer->after( 3 => sub { $do_something } );
+    use ONE::Collect; # Really just AnyEvent::Collect
+
+    # Collect returns only after both events have been emitted
+    collect {
+         ONE::Timer->after( 2 => event { $do_something } );
+         ONE::Timer->after( 3 => event { $do_something } );
     };
+
+    # Call an event based API syncronously
+    use ONE::Capture;
+
+    # This is essentially the same thing as "sleep 2"
+    capture { ONE::Timer->after( 2 => shift ) };
+
+    # Event arguments become the return value:
+    use AnyEvent::Socket qw( inet_aton );
+    my @ips = capture { inet_aton( 'www.google.com', shift ) };
 
 
     # You can chain one modules on to the use line...
     use ONE qw( Timer Collect );
 
     # If you want to import something from them, use = like the perl commandline
-    use ONE qw( Timer=sleep Collect );
+    use ONE qw( Timer Sleep=sleep);
 
-    # To import more then one symbol from a class, separate from with colons (:)
-    use ONE qw( Timer=sleep:sleep_until Collect );
+    # To import more then one symbol from a class, separate them with colons (:)
+    use ONE qw( Timer Sleep=sleep:sleep_until Collect );
 
 =head1 DESCRIPTION
 
@@ -124,7 +131,7 @@ This executes $todo at the next opportunity without actually doing so
 immediately.  Basically, this falls back to the event loop and then executes
 $todo.  That is:
 
-    ONE->next(sub { ... } );
+    ONE->next(event { ... } );
 
 Is conceptually the same as:
 
@@ -132,6 +139,16 @@ Is conceptually the same as:
 
 Except that the latter won't actually trigger a MooseX::Event style event and
 so it won't be wrapped, provide a $self object, etc.
+
+=head1 HELPERS
+
+=head2 sub event( CodeRef $code ) returns CodeRef
+
+Returns the wrapped code ref, to be passed to be an event listener.  This
+code ref will be blessed as Event::Wrappable.
+
+Originally defined in Event::Wrappable. This is exported into your namespace
+when you use ONE.
 
 =for test_synopsis use v5.10.0; my($do_something,$seconds,$time);
 
@@ -174,7 +191,7 @@ L<ONE::Timer|ONE::Timer>
 
 =item *
 
-L<ONE::Collect|ONE::Collect>
+L<AnyEvent:Collect|AnyEvent:Collect>
 
 =item *
 
