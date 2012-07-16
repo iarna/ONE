@@ -1,8 +1,8 @@
-# ABSTRACT: A Node.js style AnyEvent class, using MooseX::Event
+# ABSTRACT: An object oriented approach to AnyEvent, using MooseX::Event
 package ONE;
 use MooseX::Event;
+use Event::Wrappable ();
 use AnyEvent;
-use 5.10.0;
 
 with 'MooseX::Event::Role::ClassMethods';
 
@@ -35,8 +35,8 @@ thousands of times per second on a modest system.  Attaching a once listener
 to this is a way to defer code until any active events have finished
 processing.
 
-This is implemented as an AnyEvent idle watcher.  
-              
+This is implemented as an AnyEvent idle watcher.
+
 =cut
 
 has_event 'idle';
@@ -56,25 +56,29 @@ BEGIN {
     my $instance;
     sub instance {
         my $class = shift;
-        return $instance ||= $class->new(@_);
+        return $instance ||= $class->new();
     }
 }
 
+
+my $POSTPONE_W;
+
 sub BUILD {
-    my $self = shift;
-    $self->on( first_listener => sub {
+    my $instance = shift;
+
+    $instance->on( first_listener => sub {
         my $self = shift;
         my($event) = @_;
-        given ($event) {
-            when ('idle') {
-                $self->_idle_cv( AE::idle( sub { $self->emit($event) } ) );
-            }
-            when ('postpone') {
-                AE::postpone { $self->emit('postpone') }
-            }
+        if ( $event eq 'idle' ) {
+            $self->_idle_cv( AE::idle( sub { $self->emit($event) } ) );
+        }
+        elsif ( $event eq 'postpone' ) {
+            # If we used AE::postpone here, or we declare $POSTPONE_W in this scope, then we
+            # get errors about $self not being available to the closure.
+            $POSTPONE_W ||= AE::timer( 0, 0, sub { undef $POSTPONE_W; $self->emit('postpone') } );
         }
     } );
-    $self->on( no_listeners => sub {
+    $instance->on( no_listeners => sub {
         my $self = shift;
         my($event) = @_;
         return unless $event eq 'idle';
@@ -106,7 +110,7 @@ sub loop {
     $cv->recv();
 }
 
-=classmethod method stop() 
+=classmethod method stop()
 
 Exits the main event loop and emits the stop event.  If no loop is active it
 does nothing and does not emit an event.
@@ -128,7 +132,7 @@ This executes $todo at the next opportunity without actually doing so
 immediately.  Basically, this falls back to the event loop and then executes
 $todo.  That is:
 
-    ONE->next(sub { ... } );
+    ONE->next(event { ... } );
 
 Is conceptually the same as:
 
@@ -145,16 +149,17 @@ sub next {
     $self->once( 'postpone', $todo );
 }
 
+
 sub import {
     my $class = shift;
     my $caller = caller;
-    
+
     for (@_) {
         my($module,$args) = split /=/;
         my @args = split /[:]/, $args || "";
 
         local $@;
-        eval "require ONE::$module;"; 
+        eval "require ONE::$module;";
         if ( $@ ) {
             require Carp;
             Carp::croak( $@ );
@@ -165,8 +170,20 @@ sub import {
             Carp::croak( $@ );
         }
     }
-    
+
+    no strict 'refs';
+    *{$caller."::event"} = *Event::Wrappable::event;
 }
+
+=helper sub event( CodeRef $code ) returns CodeRef
+
+Returns the wrapped code ref, to be passed to be an event listener.  This
+code ref will be blessed as Event::Wrappable.
+
+Originally defined in Event::Wrappable. This is exported into your namespace
+when you use ONE.
+
+=cut
 
 __PACKAGE__->meta->make_immutable();
 no MooseX::Event;
@@ -187,48 +204,48 @@ no MooseX::Event;
 
     # One shot and repeating timers:
     use ONE::Timer;
-    ONE::Timer->after( $seconds => sub { $do_something } );
-    ONE::Timer->at( $time => sub { $do_something } );
-    ONE::Timer->every( $seconds => sub { $do_something } );
-    
+    ONE::Timer->after( $seconds => event { $do_something } );
+    ONE::Timer->at( $time => event { $do_something } );
+    ONE::Timer->every( $seconds => event { $do_something } );
+
     # Or with guards:
-    my $timer = ONE::Timer->every( $seconds => sub { $do_something } );
+    my $timer = ONE::Timer->every( $seconds => event { $do_something } );
     $timer->cancel(); # Ends the timer
     $timer = undef;   # Also ends the timer
-    
+
     # Coro/event loop safe sleeping
     use ONE::Coro qw( sleep );
     sleep $seconds;
-    
+
     # POSIX signals:
     use ONE::Signal;
-    ONE::Signal->on( TERM => sub { $do_something } );
+    ONE::Signal->on( TERM => event { $do_something } );
 
     # Called when the event loop is idle (if applicable)
-    ONE->once( idle => sub { $do_something } );
+    ONE->once( idle => event { $do_something } );
 
     # Trigger an event only after some other events have triggered
     use ONE::Collect;
-    my $group = ONE::Collect->group(sub {
-        ONE::Timer->after( 2 => sub { $do_something } );
-        ONE::Timer->after( 3 => sub { $do_something } );
+    my $group = ONE::Collect->group(event {
+        ONE::Timer->after( 2 => event { $do_something } );
+        ONE::Timer->after( 3 => event { $do_something } );
         });
-    $group->once( complete => sub { $do_something } );
-    
+    $group->once( complete => event { $do_something } );
+
     # Or procedurally:
     use ONE::Coro qw( collect );
     collect { # Return after both events have been emitted
-         ONE::Timer->after( 2 => sub { $do_something } );
-         ONE::Timer->after( 3 => sub { $do_something } );
-    }; 
+         ONE::Timer->after( 2 => event { $do_something } );
+         ONE::Timer->after( 3 => event { $do_something } );
+    };
 
 
     # You can chain one modules on to the use line...
     use ONE qw( Timer Collect );
-    
+
     # If you want to import something from them, use = like the perl commandline
     use ONE qw( Timer=sleep Collect );
-    
+
     # To import more then one symbol from a class, separate from with colons (:)
     use ONE qw( Timer=sleep:sleep_until Collect );
 
@@ -239,7 +256,7 @@ use v5.10.0; my($do_something,$seconds,$time);
 
 ONE provides a layer on top of AnyEvent that uses MooseX::Event as it's
 interface.  The goal of this suite of modules is to provide all of the
-functionality of L<AnyEvent> but with the style and ease of use of Node.js. 
+functionality of L<AnyEvent> but with the style and ease of use of Node.js.
 This suite of classes is intended to be use by programs written in the
 event-based style.
 
@@ -251,12 +268,12 @@ L<MooseX::Event>.
 All event handlers receive the object that emitted the event as their first argument,
 along with any event specific arguments after that.  In the case of ONE::Timer, this object
 is the guard object-- you can cancel a repeating timer in this fashion, even if you didn't
-store the object to begin with.  
+store the object to begin with.
 
 =head1 COROUTINES
 
 The event system that ONE is built on, L<MooseX::Event>, is L<Coro> aware,
-and you do not need to use unblock_sub with any ONE event listeners. 
+and you do not need to use unblock_sub with any ONE event listeners.
 L<MooseX::Event> listeners and thus by extenstion, ONE listeners, always run
 in their own thread when L<Coro> is loaded.  As such, you can safely block
 from them without risking deadlocks or other nastyness.

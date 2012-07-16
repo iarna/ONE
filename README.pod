@@ -1,6 +1,8 @@
+=pod
+
 =head1 NAME
 
-ONE - A Node.js style AnyEvent class, using MooseX::Event
+ONE - An object oriented approach to AnyEvent, using MooseX::Event
 
 =head1 VERSION
 
@@ -36,7 +38,7 @@ version 0.3.0
     ONE::Signal->on( TERM => sub { $do_something } );
 
     # Called when the event loop is idle (if applicable)
-    ONE->on( idle => sub { $do_something } );
+    ONE->once( idle => sub { $do_something } );
 
     # Trigger an event only after some other events have triggered
     use ONE::Collect;
@@ -97,11 +99,11 @@ This is implemented as an AnyEvent idle watcher.
 
 =head1 CLASS METHODS
 
-=head2 our method instance() returns ONE
+=head2 method instance() returns ONE
 
 Return the singleton object for this class
 
-=head2 our method loop()
+=head2 method loop()
 
 Starts the main event loop.  This will return when the stop method is
 called.  If you call start with an already active loop, the previous loop
@@ -111,10 +113,25 @@ before calling loop().
 Calling this will emit a start event (but only after the previously active
 loop was stopped).
 
-=head2 our method stop()
+=head2 method stop()
 
 Exits the main event loop and emits the stop event.  If no loop is active it
 does nothing and does not emit an event.
+
+=head2 method next( CodeRef $todo )
+
+This executes $todo at the next opportunity without actually doing so
+immediately.  Basically, this falls back to the event loop and then executes
+$todo.  That is:
+
+    ONE->next(sub { ... } );
+
+Is conceptually the same as:
+
+    AE::postpone { ... };
+
+Except that the latter won't actually trigger a MooseX::Event style event and
+so it won't be wrapped, provide a $self object, etc.
 
 =for test_synopsis use v5.10.0; my($do_something,$seconds,$time);
 
@@ -133,7 +150,7 @@ L<MooseX::Event> listeners and thus by extenstion, ONE listeners, always run
 in their own thread when L<Coro> is loaded.  As such, you can safely block
 from them without risking deadlocks or other nastyness.
 
-=head1 RElATED
+=head1 RELATED
 
 =over
 
@@ -169,13 +186,18 @@ L<ONE::Coro|ONE::Coro>
 
 =back
 
+=head1 SOURCE
+
+The development version is on github at L<http://https://github.com/iarna/ONE>
+and may be cloned from L<git://https://github.com/iarna/ONE.git>
+
 =head1 AUTHOR
 
 Rebecca Turner <becca@referencethis.com>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2011 by Rebecca Turner.
+This software is copyright (c) 2012 by Rebecca Turner.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
@@ -202,3 +224,7 @@ RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A
 FAILURE OF THE SOFTWARE TO OPERATE WITH ANY OTHER SOFTWARE), EVEN IF
 SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
 DAMAGES.
+
+
+=cut
+

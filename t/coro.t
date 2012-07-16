@@ -1,21 +1,29 @@
 use strict;
 use warnings;
-use Test::More tests => 6;
-use Coro;
-use ONE qw( Timer Signal Coro=sleep:collect );
+BEGIN {
+    require Test::More;
+    eval q{ use Coro };
+    if ( $@ ) {
+        Test::More->import( skip_all => $@ );
+    }
+    else {
+        Test::More->import( tests => 6 );
+    }
+}
+use ONE qw( Timer );
 
 my $started = 0; 
 my $finished = 0;
-ONE->on( start => sub { $started ++ } );
-ONE->on( stop  => sub { $finished ++ } );
+ONE->on( start => event { $started ++ } );
+ONE->on( stop  => event { $finished ++ } );
 
 my $idlecount = 0;
-my $idle = ONE->on( idle => sub { $idlecount ++ } );
+my $idle = ONE->on( idle => event { $idlecount ++ } );
 
 # We're also testing loop and stop here
 # And just to prove we can, we cede here, this is safe because under Coro,
 # event listeners run in their own threads
-ONE::Timer->every( 0.1 => sub { cede; ONE->stop } );
+ONE::Timer->every( 0.1 => event { cede; ONE->stop } );
 
 ONE->loop;
 

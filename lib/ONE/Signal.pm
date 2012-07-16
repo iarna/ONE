@@ -6,8 +6,6 @@ use Config ();
 
 with 'MooseX::Event::Role::ClassMethods';
 
-has '_signal'  => (is=>'rw', default=>sub{{}}, init_arg=>undef);
-
 =event <SIG>
 
 Where <SIG> is one of the signal names from Config's sig_name key.  Common
@@ -19,20 +17,22 @@ signals to trap include:
 
 has_events split / /, $Config::Config{'sig_name'};
 
+my %SIGNAL;
+
 sub BUILD {
     my $self = shift;
     $self->on( first_listener => sub {
         my $self = shift;
         my( $event ) = @_;
         if ( $event =~ /^[A-Z]+$/ ) {
-            $self->_signal->{$event} = AE::signal $event, sub { $self->emit($event) };
+            $SIGNAL{$event} = AE::signal $event, sub { $self->emit($event) };
         }
     } );
     $self->on( no_listeners   => sub {
         my $self = shift;
         my( $event ) = @_;
-        if ( exists $self->_signal->{$event} ) {
-            delete $self->_signal->{$event};
+        if ( exists $SIGNAL{$event} ) {
+            delete $SIGNAL{$event};
         }
     } );
 }
@@ -58,7 +58,7 @@ BEGIN {
 
     # POSIX signals:
     use ONE::Signal;
-    ONE::Signal->on( INT => sub { ... } );
+    ONE::Signal->on( INT => event { ... } );
 
 =head1 DESCRIPTION
 

@@ -71,10 +71,10 @@ sub BUILD {
 =head1 SYNOPSIS
 
     use ONE::IO;
-    
+
     # Wait until STDIN is readable, then read one line
     my $stdin = ONE::IO->new( fh=>\*STDIN );
-    $stdin->once( readable => sub {
+    $stdin->once( readable => event {
         my $self = shift;
         my( $fh ) = @_;
         chomp( my $input = <$fh>);

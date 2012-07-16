@@ -96,12 +96,12 @@ the object will cancel the timer.
 sub start {
     my $self = shift;
     my( $is_weak ) = @_;
-    
+
     if ( defined $self->_guard ) {
         require Carp;
         Carp::croak( "Can't start a timer that's already running" );
     }
-    
+
     my $cb;
     Scalar::Util::weaken($self) if $is_weak;
     if ( $self->interval ) {
@@ -149,24 +149,24 @@ __PACKAGE__->meta->make_immutable();
 =head1 SYNOPSIS
 
     use ONE::Timer;
-    
+
     # After five seconds, say Hi
-    ONE::Timer->after( 5, sub { say "Hi!" } );
-    
+    ONE::Timer->after( 5, event { say "Hi!" } );
+
     # Two seconds from now, say At!
-    ONE::Timer->at( time()+2, sub { say "At!" } );
-    
+    ONE::Timer->at( time()+2, event { say "At!" } );
+
     # Every 5 seconds, starting 5 seconds from now, say Ping
-    ONE::Timer->every( 5, sub { say "Ping" } );
-    
+    ONE::Timer->every( 5, event { say "Ping" } );
+
     my $timer = ONE::Timer->new( delay=>5, interval=>25 );
-    
-    $timer->on( timeout => sub { say "Timer tick" } );
-    
+
+    $timer->on( timeout => event { say "Timer tick" } );
+
     $timer->start(); # Will say "Timer tick" in 5 secs and then ever 25 secs after that
-    
+
     # ... later
-    
+
     $timer->cancel(); # Will stop saying "Timer tick"
 
 =for test_synopsis
