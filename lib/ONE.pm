@@ -12,9 +12,14 @@ has '_idle_cv' => (is=>'rw', init_arg=>undef );
 
 =event start
 
-This is emitted just before the event loop is started up with ONE's loop method.  Note
-that this will not be triggered if you start an event loop on your own, or via a utility
-method (like ONE::Coro::sleep).
+This is emitted just after the event loop is started up with ONE's loop
+method.  Note that this will not be triggered if you start an event loop on
+your own, or via a utility method (like ONE::Coro::sleep).  If you stop and
+start the event loop repeatedly, this will be triggered repeatedly.
+
+If you want code to execute when the event loop next starts, use ONE->next. 
+If you'll be the one starting the event loop, just pass the code to
+ONE->loop.
 
 =cut
 
@@ -86,7 +91,7 @@ sub BUILD {
     } );
 }
 
-=classmethod method loop()
+=classmethod method loop( CodeRef $next=undef )
 
 Starts the main event loop.  This will return when the stop method is
 called.  If you call start with an already active loop, the previous loop
@@ -96,6 +101,10 @@ before calling loop().
 Calling this will emit a start event (but only after the previously active
 loop was stopped).
 
+You can optionally pass a coderef in-- if you do, it will be executed as
+soon as the event loop has started up.  (It's equivalent to calling ->next
+with the coderef prior to calling ->loop)
+
 =cut
 
 sub loop {
@@ -104,7 +113,13 @@ sub loop {
     if ( defined $self->_loop_cv ) {
         $self->stop();
     }
-    $self->emit( 'start' );
+    $self->once( 'postpone', Event::Wrappable::event {
+        $self->emit( 'start' );
+    });
+    if (@_) {
+        my $todo = shift;
+        $self->once( 'postpone', $todo );
+    }
     my $cv = AE::cv;
     $self->_loop_cv( $cv );
     $cv->recv();
