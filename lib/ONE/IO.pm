@@ -24,45 +24,21 @@ Triggered whenever the file handle has become writable
 =cut
 has_event 'writable';
 
-sub setup_readable {
-    my $self = shift;
-    weaken $self;
-    $self->_readable( AE::io $self->fh, 0, sub { $self->emit('readable', $self->fh) } );
-}
-
-sub setup_writable {
-    my $self = shift;
-    weaken $self;
-    $self->_writable( AE::io $self->fh, 1, sub { $self->emit('writable', $self->fh) } );
-}
-
-sub teardown_readable {
-    my $self = shift;
-    $self->_readable( undef );
-}
-
-sub teardown_writable {
-    my $self = shift;
-    $self->_writable( undef );
-}
-
 sub BUILD {
     my $self = shift;
-    $self->on( first_listener => sub {
-        my $self = shift;
-        my( $event ) = @_;
-        my $method = "setup_$event";
-        if ( $self->can($method) ) {
-            $self->$method($event);
-        }
+    my $readable = $self->metaevent("readable");
+    $readable->on( first_listener => event {
+        $self->_readable( AE::io $self->fh, 0, sub { $self->emit('readable', $self->fh) } );
     } );
-    $self->on( no_listeners   => sub {
-        my $self = shift;
-        my( $event ) = @_;
-        my $method = "teardown_$event";
-        if ( $self->can($method) ) {
-            $self->$method($event);
-        }
+    $readable->on( no_listeners => event {
+        $self->_writable( undef );
+    } );
+    my $writable = $self->metaevent("writable");
+    $writable->on( first_listener => event {
+        $self->_writable( AE::io $self->fh, 1, sub { $self->emit('writable', $self->fh) } );
+    } );
+    $writable->on( no_listeners => event {
+        $self->_writable( undef );
     } );
 }
 

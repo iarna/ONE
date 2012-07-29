@@ -1,7 +1,7 @@
 # ABSTRACT: An object oriented approach to AnyEvent, using MooseX::Event
 package ONE;
 use MooseX::Event;
-use Event::Wrappable ();
+use Event::Wrappable;
 use AnyEvent;
 
 with 'MooseX::Event::Role::ClassMethods';
@@ -17,7 +17,7 @@ method.  Note that this will not be triggered if you start an event loop on
 your own, or via a utility method (like ONE::Coro::sleep).  If you stop and
 start the event loop repeatedly, this will be triggered repeatedly.
 
-If you want code to execute when the event loop next starts, use ONE->next. 
+If you want code to execute when the event loop next starts, use ONE->next.
 If you'll be the one starting the event loop, just pass the code to
 ONE->loop.
 
@@ -46,10 +46,6 @@ This is implemented as an AnyEvent idle watcher.
 
 has_event 'idle';
 
-# This is used interanlly via ONE->next.  It should not be used directly as
-# it would be an error to listen for it with 'on' versus 'once.'
-has_event 'postpone';
-
 =classmethod method instance() returns ONE
 
 Return the singleton object for this class
@@ -66,28 +62,17 @@ BEGIN {
 }
 
 
-my $POSTPONE_W;
 
 sub BUILD {
     my $instance = shift;
+    my $idle_listener = event { $instance->emit('idle') };
 
-    $instance->on( first_listener => sub {
-        my $self = shift;
-        my($event) = @_;
-        if ( $event eq 'idle' ) {
-            $self->_idle_cv( AE::idle( sub { $self->emit($event) } ) );
-        }
-        elsif ( $event eq 'postpone' ) {
-            # If we used AE::postpone here, or we declare $POSTPONE_W in this scope, then we
-            # get errors about $self not being available to the closure.
-            $POSTPONE_W ||= AE::timer( 0, 0, sub { undef $POSTPONE_W; $self->emit('postpone') } );
-        }
+    my $idle_meta = $instance->metaevent('idle');
+    $idle_meta->on( add_listener => event {
+        $instance->_idle_cv( AE::idle( $idle_listener ) );
     } );
-    $instance->on( no_listeners => sub {
-        my $self = shift;
-        my($event) = @_;
-        return unless $event eq 'idle';
-        $self->_idle_cv( undef );
+    $idle_meta->on( no_listeners => event {
+        $instance->_idle_cv( undef );
     } );
 }
 
@@ -113,12 +98,13 @@ sub loop {
     if ( defined $self->_loop_cv ) {
         $self->stop();
     }
-    $self->once( 'postpone', Event::Wrappable::event {
-        $self->emit( 'start' );
+    $self->next(sub {
+         my $self = shift;
+         $self->emit('start');
     });
     if (@_) {
         my $todo = shift;
-        $self->once( 'postpone', $todo );
+        $self->next($todo);
     }
     my $cv = AE::cv;
     $self->_loop_cv( $cv );
@@ -161,7 +147,10 @@ sub next {
     my $invok = shift;
     my $self = ref($invok)? $invok: $invok->instance;
     my($todo) = @_;
-    $self->once( 'postpone', $todo );
+    if ( ! blessed($todo) or ! $todo->isa('Event::Wrappable') ) {
+        $todo = &Event::Wrappable::event($todo);
+    }
+    my $postpone_watcher; $postpone_watcher = AE::timer( 0, 0, sub { undef $postpone_watcher; $self->$todo(); } );
 }
 
 

@@ -15,26 +15,40 @@ signals to trap include:
 
 =cut
 
-has_events split / /, $Config::Config{'sig_name'};
+my @signals = split / /, $Config::Config{'sig_name'};
+
+has_events @signals;
+
+my %SETUP;
+
+before on => sub {
+    my $self = shift;
+    use DDP;
+    my $listener = pop;
+    for ( @_ ) {
+        next if exists $SETUP{$_};
+        $self->setup_signal($_);
+    }
+};
 
 my %SIGNAL;
 
-sub BUILD {
+sub setup_signal {
     my $self = shift;
-    $self->on( first_listener => sub {
-        my $self = shift;
-        my( $event ) = @_;
-        if ( $event =~ /^[A-Z]+$/ ) {
-            $SIGNAL{$event} = AE::signal $event, sub { $self->emit($event) };
+    my( $signal ) = @_;
+    return if exists $SETUP{$signal};
+
+    my $emeta = $self->metaevent($signal);
+    $emeta->on( first_listener => sub {
+        $SIGNAL{$signal} = AE::signal $signal, sub { $self->emit($signal) };
+    } );
+    $emeta->on( no_listeners => sub {
+        if ( exists $SIGNAL{$signal} ) {
+            delete $SIGNAL{$signal};
         }
     } );
-    $self->on( no_listeners   => sub {
-        my $self = shift;
-        my( $event ) = @_;
-        if ( exists $SIGNAL{$event} ) {
-            delete $SIGNAL{$event};
-        }
-    } );
+
+    $SETUP{$signal} = 1;
 }
 
 =classmethod method instance() returns ONE
