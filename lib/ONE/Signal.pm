@@ -27,13 +27,13 @@ before on => sub {
     my $listener = pop;
     for ( @_ ) {
         next if exists $SETUP{$_};
-        $self->setup_signal($_);
+        $self->_setup_signal($_);
     }
 };
 
 my %SIGNAL;
 
-sub setup_signal {
+sub _setup_signal {
     my $self = shift;
     my( $signal ) = @_;
     return if exists $SETUP{$signal};
